@@ -6,13 +6,14 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, User, CalendarIcon as Calendar, PhoneIcon, Mail } from "lucide-react";
+import { Search, User, CalendarIcon as Calendar, PhoneIcon, Mail, Download } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { collection, query, where, getDocs, DocumentData } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 interface Patient {
   uid: string;
@@ -20,7 +21,6 @@ interface Patient {
   email: string;
   phone?: string;
   dateOfBirth?: string; // Stored as YYYY-MM-DD
-  // Add other relevant fields as needed
 }
 
 export default function DoctorPatientsPage() {
@@ -94,10 +94,43 @@ export default function DoctorPatientsPage() {
     setSearchTerm(e.target.value);
   };
 
+  const exportToCSV = () => {
+    if (filteredPatients.length === 0) {
+      toast({ title: "No Data", description: "No patients to export.", variant: "default" });
+      return;
+    }
+
+    const headers = ["Patient UID", "Full Name", "Email", "Phone", "Date of Birth"];
+    const rows = filteredPatients.map(p => [
+      p.uid,
+      p.fullName,
+      p.email,
+      p.phone || "N/A",
+      p.dateOfBirth ? format(new Date(p.dateOfBirth), "yyyy-MM-dd") : "N/A" // Ensure consistent format
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n" 
+      + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `patient_records_${new Date().toISOString().substring(0,10)}.csv`);
+    document.body.appendChild(link); 
+    link.click();
+    document.body.removeChild(link);
+
+    toast({ title: "Exported", description: "Patient data exported to CSV." });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline">My Patient Records</h1>
+        <Button onClick={exportToCSV} variant="outline" disabled={isLoading || filteredPatients.length === 0}>
+          <Download className="mr-2 h-4 w-4" /> Export to CSV
+        </Button>
       </div>
       <Card>
         <CardHeader>
@@ -143,10 +176,9 @@ export default function DoctorPatientsPage() {
                   <CardContent className="space-y-2 text-sm flex-grow">
                     <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> {patient.email}</p>
                     {patient.phone && <p className="flex items-center gap-2"><PhoneIcon className="h-4 w-4 text-muted-foreground" /> {patient.phone}</p>}
-                    {patient.dateOfBirth && <p className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /> DOB: {patient.dateOfBirth}</p>}
+                    {patient.dateOfBirth && <p className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /> DOB: {format(new Date(patient.dateOfBirth), 'PPP')}</p>}
                   </CardContent>
                   <CardFooter>
-                    {/* In a real app, this would link to a detailed patient view/visit page */}
                     <Button className="w-full" asChild>
                        <Link href={`/doctor/visits/${patient.uid}`}>View Details & Visits</Link>
                     </Button>
@@ -167,3 +199,5 @@ export default function DoctorPatientsPage() {
     </div>
   );
 }
+
+    
