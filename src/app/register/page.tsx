@@ -5,7 +5,8 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Assuming you have this from previous steps
+import { auth, db } from '@/lib/firebase'; // Assuming you have this from previous steps
+import { doc, setDoc } from "firebase/firestore"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // Optional: store this later
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -48,8 +49,18 @@ export default function RegisterPage() {
 
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // You might want to store the fullName in Firestore or update Firebase profile here
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Store additional user info in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        fullName: fullName,
+        role: "Patient", // Default role for new users
+        createdAt: new Date(),
+      });
+
       toast({
         title: "Registration Successful",
         description: "Account created. Please login.",
@@ -155,3 +166,4 @@ export default function RegisterPage() {
     </main>
   );
 }
+
