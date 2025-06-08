@@ -16,38 +16,55 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar'; 
 import { Globe, LogOut, UserCircle, Lock, LogIn } from 'lucide-react';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // Added db
 import { signOut, onAuthStateChanged, type User } from 'firebase/auth';
+import { doc, getDoc } from "firebase/firestore"; // Added doc, getDoc
 import { useToast } from '@/hooks/use-toast';
 
 interface AppHeaderProps {
-  userRole?: string; // To display role or customize avatar
+  userRole?: string; // This prop comes from the layout (e.g., AdminLayout)
 }
 
-const AppHeader: FC<AppHeaderProps> = ({ userRole: initialUserRole }) => {
+interface UserProfile {
+  fullName?: string;
+  email?: string | null;
+  role?: string;
+}
+
+const AppHeader: FC<AppHeaderProps> = ({ userRole: layoutDefinedRole }) => {
   const [language, setLanguage] = useState<'en' | 'km'>('en');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userRoleForDisplay, setUserRoleForDisplay] = useState(initialUserRole);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (user && !initialUserRole) {
-        // Potentially fetch role from Firestore/custom claims if not passed as prop
-        // For now, we can try to use a generic label or email part
-        setUserRoleForDisplay(user.email?.split('@')[0] || 'User');
-      } else if (!user) {
-        setUserRoleForDisplay(undefined);
+      if (user) {
+        // Fetch user data from Firestore
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          setUserProfile({
+            fullName: data.fullName,
+            email: user.email,
+            role: data.role,
+          });
+        } else {
+          // User exists in Auth but not Firestore (should not happen with current setup)
+          setUserProfile({ email: user.email, role: layoutDefinedRole || "User" }); 
+        }
+      } else {
+        setUserProfile(null);
       }
     });
     return () => unsubscribe();
-  }, [initialUserRole]);
+  }, [layoutDefinedRole]);
 
   const toggleLanguage = () => {
     setLanguage(prevLang => (prevLang === 'en' ? 'km' : 'en'));
-    // In a real app, this would trigger i18n language change
     toast({ title: language === 'en' ? "ភាសាបានប្តូរទៅជាខ្មែរ" : "Language switched to English" });
   };
 
@@ -62,13 +79,22 @@ const AppHeader: FC<AppHeaderProps> = ({ userRole: initialUserRole }) => {
     }
   };
 
-  const getInitials = (roleOrEmail?: string) => {
-    if (!roleOrEmail) return "U";
-    if (roleOrEmail.includes('@')) { // it's an email
-      return roleOrEmail.substring(0, 1).toUpperCase();
+  const getInitials = (profile?: UserProfile | null) => {
+    if (!profile) return "U";
+    if (profile.fullName) {
+      return profile.fullName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
     }
-    return roleOrEmail.substring(0, 1).toUpperCase(); // it's a role
+    if (profile.email) {
+      return profile.email.substring(0, 1).toUpperCase();
+    }
+    if (profile.role) {
+      return profile.role.substring(0, 1).toUpperCase();
+    }
+    return "U";
   }
+  
+  const displayName = userProfile?.fullName || userProfile?.email || "My Account";
+  const displayRole = userProfile?.role;
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6 shadow-sm">
@@ -90,22 +116,22 @@ const AppHeader: FC<AppHeaderProps> = ({ userRole: initialUserRole }) => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(currentUser.email || userRoleForDisplay)}`} alt={currentUser.email || userRoleForDisplay || "User"} data-ai-hint="profile person" />
-                  <AvatarFallback>{getInitials(currentUser.email || userRoleForDisplay)}</AvatarFallback>
+                  <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(userProfile)}`} alt={displayName} data-ai-hint="profile person" />
+                  <AvatarFallback>{getInitials(userProfile)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
-                {currentUser.email || "My Account"}
-                {userRoleForDisplay && !(currentUser.email) && <span className="text-xs text-muted-foreground">({userRoleForDisplay})</span>}
+                {displayName}
+                {displayRole && <span className="block text-xs text-muted-foreground font-normal">({displayRole})</span>}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/patient/settings')}> {/* Generic settings link */}
+              <DropdownMenuItem onClick={() => router.push(`/${(displayRole || 'patient').toLowerCase()}/settings`)}>
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/patient/settings')}> {/* Generic settings link */}
+              <DropdownMenuItem onClick={() => router.push(`/${(displayRole || 'patient').toLowerCase()}/settings`)}>
                 <Lock className="mr-2 h-4 w-4" />
                 <span>Change Password</span>
               </DropdownMenuItem>
