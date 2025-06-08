@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Save, Palette, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea"; // For address if it needs more space
+import { Save, Palette, Loader2, CalendarIcon as CalendarIconLucide } from "lucide-react"; // Renamed to avoid conflict
 import {
   Select,
   SelectContent,
@@ -15,17 +16,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from 'date-fns';
 
 interface UserProfileData {
   fullName: string;
   email: string;
   phone: string;
   role?: string;
+  dateOfBirth?: string; // Stored as YYYY-MM-DD string
+  gender?: string;
+  address?: string;
 }
+
+const genderOptions = ["Male", "Female", "Other", "Prefer not to say"];
 
 export default function PatientSettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,6 +41,9 @@ export default function PatientSettingsPage() {
     fullName: '',
     email: '',
     phone: '',
+    dateOfBirth: undefined,
+    gender: '',
+    address: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,12 +59,14 @@ export default function PatientSettingsPage() {
           const dbData = userDocSnap.data();
           setProfileData({
             fullName: dbData.fullName || '',
-            email: currentUser.email || dbData.email || '', // Prefer auth email, fallback to db
+            email: currentUser.email || dbData.email || '',
             phone: dbData.phone || '',
             role: dbData.role || 'Patient',
+            dateOfBirth: dbData.dateOfBirth || undefined, // Expects YYYY-MM-DD string
+            gender: dbData.gender || '',
+            address: dbData.address || '',
           });
         } else {
-          // Should not happen if user registered correctly
           setProfileData(prev => ({ ...prev, email: currentUser.email || '' }));
           toast({
             title: "Error",
@@ -63,16 +76,23 @@ export default function PatientSettingsPage() {
         }
       } else {
         setUser(null);
-        // Optionally, redirect to login or show a message
       }
       setIsLoading(false);
     });
     return () => unsubscribe();
-  }, [toast, db]); // Added db to dependency array for completeness
+  }, [toast]);
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setProfileData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleGenderChange = (value: string) => {
+    setProfileData(prev => ({ ...prev, gender: value }));
+  };
+
+  const handleDateOfBirthChange = (date?: Date) => {
+    setProfileData(prev => ({ ...prev, dateOfBirth: date ? format(date, 'yyyy-MM-dd') : undefined }));
   };
 
   const handleSaveProfile = async () => {
@@ -83,13 +103,25 @@ export default function PatientSettingsPage() {
     setIsSaving(true);
     try {
       const userDocRef = doc(db, "users", user.uid);
-      // Preserve role and email from auth, only update fullName and phone from form
-      await setDoc(userDocRef, { 
+      const dataToSave: Partial<UserProfileData> = { 
         fullName: profileData.fullName,
         phone: profileData.phone,
-        email: user.email, // Keep email from auth
-        role: profileData.role // Preserve existing role
-      }, { merge: true }); 
+        dateOfBirth: profileData.dateOfBirth,
+        gender: profileData.gender,
+        address: profileData.address,
+        // email and role are not updated from this form directly
+        email: user.email, 
+        role: profileData.role 
+      };
+      
+      // Remove undefined fields before saving
+      Object.keys(dataToSave).forEach(key => {
+        if (dataToSave[key as keyof UserProfileData] === undefined) {
+          delete dataToSave[key as keyof UserProfileData];
+        }
+      });
+
+      await setDoc(userDocRef, dataToSave, { merge: true }); 
       toast({ title: "Profile Saved", description: "Your information has been updated." });
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -117,6 +149,9 @@ export default function PatientSettingsPage() {
     );
   }
 
+  // Convert string date to Date object for DatePicker
+  const dobDate = profileData.dateOfBirth ? parseISO(profileData.dateOfBirth) : undefined;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline">Profile Settings</h1>
@@ -126,36 +161,81 @@ export default function PatientSettingsPage() {
           <CardDescription>Update your contact details and preferences.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input 
-              id="fullName" 
-              value={profileData.fullName} 
-              onChange={handleInputChange} 
-              disabled={isSaving}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input 
+                id="fullName" 
+                value={profileData.fullName} 
+                onChange={handleInputChange} 
+                disabled={isSaving}
+                placeholder="Your full name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                value={profileData.email} 
+                readOnly 
+                disabled 
+                className="bg-muted/50 cursor-not-allowed"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              value={profileData.email} 
-              readOnly 
-              disabled // Email typically not changed here or requires re-authentication
-              className="bg-muted/50"
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input 
+                id="phone" 
+                type="tel" 
+                value={profileData.phone} 
+                onChange={handleInputChange} 
+                placeholder="e.g., +1 234 567 8900"
+                disabled={isSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateOfBirth">Date of Birth</Label>
+              <DatePicker
+                date={dobDate}
+                setDate={handleDateOfBirthChange}
+                className={isSaving ? "disabled:opacity-50" : ""}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input 
-              id="phone" 
-              type="tel" 
-              value={profileData.phone} 
-              onChange={handleInputChange} 
-              placeholder="e.g., +1 234 567 8900"
-              disabled={isSaving}
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              <Select 
+                value={profileData.gender} 
+                onValueChange={handleGenderChange}
+                disabled={isSaving}
+              >
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  {genderOptions.map(option => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+             <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Textarea
+                id="address"
+                value={profileData.address}
+                onChange={handleInputChange}
+                placeholder="123 Main St, Anytown, USA"
+                rows={3}
+                disabled={isSaving}
+              />
+            </div>
           </div>
         </CardContent>
         <CardFooter className="border-t pt-6 flex justify-end">
@@ -171,10 +251,8 @@ export default function PatientSettingsPage() {
           <CardTitle>Security &amp; Preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Password change functionality would typically be handled by Firebase Auth methods */}
           <p className="text-sm text-muted-foreground">Password change functionality is typically handled via email reset or requires re-authentication. For this demo, it's not implemented here.</p>
           
-          {/* Placeholder for password fields - non-functional in this update */}
           <div className="space-y-2 opacity-50">
             <Label htmlFor="currentPassword">Current Password</Label>
             <Input id="currentPassword" type="password" disabled />
@@ -204,7 +282,7 @@ export default function PatientSettingsPage() {
           </div>
         </CardContent>
          <CardFooter className="border-t pt-6 flex justify-end">
-          <Button disabled> {/* Kept disabled as per current scope */}
+          <Button disabled> 
             <Save className="mr-2 h-4 w-4" /> Update Settings
           </Button>
         </CardFooter>
@@ -212,3 +290,5 @@ export default function PatientSettingsPage() {
     </div>
   );
 }
+
+    
