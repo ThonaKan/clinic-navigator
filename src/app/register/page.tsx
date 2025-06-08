@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import type { ChangeEvent, FormEvent} from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Define roles available for public registration - Admin is excluded
 type UserRole = "Patient" | "Doctor" | "Nurse" | "Receptionist" | "Cashier";
 
 const availableRoles: UserRole[] = ["Patient", "Doctor", "Nurse", "Receptionist", "Cashier"];
@@ -30,7 +32,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>("Patient");
+  const [selectedRole, setSelectedRole] = useState<UserRole>("Patient"); // Default to Patient
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
