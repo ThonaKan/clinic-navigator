@@ -5,7 +5,7 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase'; // Assuming you have this from previous steps
+import { auth, db } from '@/lib/firebase'; 
 import { doc, setDoc } from "firebase/firestore"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +13,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Compass, UserPlus, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type UserRole = "Patient" | "Doctor" | "Nurse" | "Receptionist" | "Cashier";
+
+const availableRoles: UserRole[] = ["Patient", "Doctor", "Nurse", "Receptionist", "Cashier"];
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>("Patient");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -47,7 +59,6 @@ export default function RegisterPage() {
       return;
     }
 
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -57,7 +68,7 @@ export default function RegisterPage() {
         uid: user.uid,
         email: user.email,
         fullName: fullName,
-        role: "Patient", // Default role for new users
+        role: selectedRole, 
         createdAt: new Date(),
       });
 
@@ -148,6 +159,23 @@ export default function RegisterPage() {
                 disabled={isLoading}
               />
             </div>
+             <div className="space-y-2">
+              <Label htmlFor="role">Select Your Role</Label>
+              <Select 
+                value={selectedRole} 
+                onValueChange={(value: UserRole) => setSelectedRole(value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="role" className="w-full">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRoles.map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="animate-spin mr-2" /> : <UserPlus className="mr-2 h-4 w-4" />}
               {isLoading ? 'Registering...' : 'Register'}
@@ -166,4 +194,3 @@ export default function RegisterPage() {
     </main>
   );
 }
-
