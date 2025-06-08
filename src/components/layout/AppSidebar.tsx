@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { FC } from 'react';
@@ -39,7 +40,7 @@ const AppSidebar: FC<AppSidebarProps> = ({ userRole }) => {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
+              <Link href={item.href}>
                 <SidebarMenuButton
                   isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
                   tooltip={{ children: item.label, className: "font-body"}}
