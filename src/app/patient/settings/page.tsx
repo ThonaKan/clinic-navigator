@@ -68,7 +68,7 @@ export default function PatientSettingsPage() {
       setIsLoading(false);
     });
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, db]); // Added db to dependency array for completeness
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
