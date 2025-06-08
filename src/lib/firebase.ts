@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 // To use other Firebase services, import them here, e.g.:
-// import { getAuth } from 'firebase/auth';
 // import { getFirestore } from 'firebase/firestore';
 // import { getStorage } from 'firebase/storage';
 // import { getAnalytics } from "firebase/analytics";
@@ -35,15 +35,9 @@ if (!getApps().length) {
 // }
 
 // Export Firebase services you want to use
-// export const auth = getAuth(app);
+export const auth = getAuth(app);
 // export const db = getFirestore(app);
 // export const storage = getStorage(app);
 // export { analytics };
 
 export { app as firebaseApp }; // Export the initialized Firebase app instance
-
-// You can add a log here to confirm config is loaded, but remove for production
-// console.log('Firebase Config Loaded:', {
-//   apiKeyExists: !!firebaseConfig.apiKey,
-//   projectId: firebaseConfig.projectId,
-// });

@@ -1,5 +1,7 @@
 import LoginForm from '@/components/auth/LoginForm';
 import { Compass } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   return (
@@ -9,6 +11,19 @@ export default function LoginPage() {
         <h1 className="text-5xl font-headline">Clinic Navigator</h1>
       </div>
       <LoginForm />
+      <div className="mt-6 text-center">
+        <p className="text-sm text-muted-foreground">
+           Explore public clinic pages or view terms.
+        </p>
+        <div className="space-x-2 mt-2">
+            <Button variant="link" asChild>
+                <Link href="/clinic/sunnyvale-medical">View Example Clinic</Link>
+            </Button>
+            <Button variant="link" asChild>
+                <Link href="/terms">Terms & Privacy</Link>
+            </Button>
+        </div>
+      </div>
     </main>
   );
 }
